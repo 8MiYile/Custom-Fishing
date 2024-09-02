@@ -14,7 +14,7 @@ jobs:
           - org-name: "Xiao-MoMi"
             repo-name: "Custom-Fishing"
             branch-name: "main"
-            #java-version: 17
+            java-version: 17
     steps:
       - name: Pull Git Repo ${{ matrix.org-name }} ${{ matrix.repo-name }} ${{ matrix.branch-name }}
         uses: actions/checkout@v4
