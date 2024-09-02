@@ -1,0 +1,68 @@
+name: Build
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build-another:
+    name: Build ${{ matrix.org-name }} ${{ matrix.repo-name }} ${{ matrix.branch-name }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    #if: false
+    strategy:
+      matrix:
+        include:
+          - org-name: "Xiao-MoMi"
+            repo-name: "Custom-Fishing"
+            branch-name: "main"
+            #java-version: 17
+    steps:
+      - name: Pull Git Repo ${{ matrix.org-name }} ${{ matrix.repo-name }} ${{ matrix.branch-name }}
+        uses: actions/checkout@v4
+        with:
+          repository: "${{ matrix.org-name }}/${{ matrix.repo-name }}"
+          ref: "${{ matrix.branch-name }}"
+      - name: SetEnv
+        id: github-text
+        env:
+          env_java_ver: "${{ matrix.java-version }}"
+        run: |
+          if [ -z "$env_java_ver" ]; then
+            echo "没有设置参数，自动读取Gradle，JDK 版本号为 $(grep -oP 'targetJavaVersion\s*=\s*\K\d+' build.gradle)"
+            echo "java_ver=$(grep -oP 'targetJavaVersion\s*=\s*\K\d+' build.gradle)" >> $GITHUB_OUTPUT
+          else
+            echo "手动设置 JDK 版本为 $env_java_ver"
+            echo "java_ver=$env_java_ver" >> $GITHUB_OUTPUT
+          fi
+          echo "branch_name=`git symbolic-ref --short HEAD`" >> $GITHUB_OUTPUT
+      - name: Setup JDK ${{ steps.github-text.outputs.java_ver }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: "${{ steps.github-text.outputs.java_ver }}"
+          cache: "gradle"
+          java-package: "jdk"
+          distribution: "liberica"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+            gradle-version: current
+            cache-disabled: true
+            build-scan-publish: true
+            build-scan-terms-of-use-url: "https://gradle.com/help/legal-terms-of-use"
+            build-scan-terms-of-use-agree: "yes"
+
+      - name: Gradle Perm
+        run: chmod +x ./gradlew
+      - name: Gradle Assemble
+        run: ./gradlew assemble
+      - name: Gradle Test
+        run: ./gradlew test clean
+      - name: Gradle Build
+        run: ./gradlew build --scan
+
+      - name: Publish to Actions Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.repo-name }}_${{ steps.github-text.outputs.branch_name }}
+          path: build/libs
+          retention-days: 1
